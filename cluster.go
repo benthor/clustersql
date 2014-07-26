@@ -1,4 +1,4 @@
-package sqlcluster
+package clustersql
 
 import "database/sql/driver"
 import "log"
@@ -70,7 +70,7 @@ func (cluster Cluster) Prepare(query string) (driver.Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Println(query)
+	//log.Println(query)
 	return conn.Prepare(query)
 }
 
