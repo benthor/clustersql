@@ -1,5 +1,4 @@
-clustersql
-==========
+# clustersql [![Build Status](https://travis-ci.org/benthor/clustersql.png)](https://travis-ci.org/benthor/clustersql) [![GoDoc](https://godoc.org/github.com/benthor/clustersql?status.svg)](http://godoc.org/github.com/benthor/clustersql)
 
 
 Go Clustering SQL Driver - A clustering, implementation-agnostic "meta"-driver for any backend implementing "database/sql/driver".
@@ -44,6 +43,5 @@ Open the registered clusterDriver with an arbitrary DSN string (not used)
 
 Continue to use the sql interface as documented at http://golang.org/pkg/database/sql/
 
-TODO
-----
+## TODO
 * tests are missing
