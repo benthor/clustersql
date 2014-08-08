@@ -5,7 +5,7 @@ go:
   - 1.2.2
 
 before_script:
-- go get .
+- go get code.google.com/p/go.tools/cmd/vet
 
 script:
 - go vet ./...
