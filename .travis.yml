@@ -9,5 +9,4 @@ before_script:
 - go get code.google.com/p/go.tools/cmd/vet
 
 script:
-- go vet ./...
 - go build .

@@ -154,8 +154,10 @@ func (cluster *Cluster) GetConn() (driver.Conn, error) {
 		close(die)
 		return node.Conn, node.Err
 	case <-time.After(45 * time.Second):
-		return nil, ClusterError{"Could not open any connection!"}
+		//leave select
 	}
+	// go 1.0 expects return at the end of a function outside of any block
+	return nil, ClusterError{"Could not open any connection!"}
 }
 
 // Prepare works as documented at http://golang.org/pkg/database/sql/#DB.Prepare
