@@ -2,7 +2,7 @@ language: go
 go: 
   - tip
   - 1.2
-  - 1.0
+  - 1.1
 
 notifications:
     email:
@@ -16,7 +16,7 @@ before_install:
     - sudo apt-get update
 
 install:
-    - sudo apt-get install mariadb-galera-server galera git -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
+    - sudo apt-get install mariadb-galera-server galera -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
 
 before_script:
     - sudo mkdir -p /tmp/maria1 /tmp/maria2 /tmp/maria3
@@ -27,10 +27,10 @@ before_script:
     - sudo dtach -n /tmp/maria1.soc mysqld --binlog-format=ROW --log-error=/tmp/maria1.log --wsrep-cluster-name="galeratest" --wsrep-cluster-address="gcomm://127.0.0.1:2001,127.0.0.2:2002,127.0.0.3:2003" --wsrep-provider=/usr/lib/galera/libgalera_smm.so --wsrep-node-address=127.0.0.1:2001 --wsrep-node-name="maria1" --wsrep-sst-auth=root:hunter2 --wsrep-new-cluster --wsrep-provider-options="pc.bootstrap=true" --datadir=/tmp/maria1 --port=3301
     - sudo dtach -n /tmp/maria2.soc mysqld --binlog-format=ROW --log-error=/tmp/maria2.log --wsrep-cluster-name="galeratest" --wsrep-cluster-address="gcomm://127.0.0.1:2001,127.0.0.2:2002,127.0.0.3:2003" --wsrep-provider=/usr/lib/galera/libgalera_smm.so --wsrep-node-address=127.0.0.2:2002 --wsrep-node-name="maria2" --wsrep-sst-auth=root:hunter2 --datadir=/tmp/maria2 --port=3302
     - sudo dtach -n /tmp/maria3.soc mysqld --binlog-format=ROW --log-error=/tmp/maria3.log --wsrep-cluster-name="galeratest" --wsrep-cluster-address="gcomm://127.0.0.1:2001,127.0.0.2:2002,127.0.0.3:2003" --wsrep-provider=/usr/lib/galera/libgalera_smm.so --wsrep-node-address=127.0.0.3:2003 --wsrep-node-name="maria3" --wsrep-sst-auth=root:hunter2 --datadir=/tmp/maria3 --port=3303
-    - sleep 30
+    - go get -v github.com/go-sql-driver/mysql
+    - sleep 10
     - sudo mysql -P 3301 -e "create database IF NOT EXISTS test;"
 
+
 script:
-- go get
-- go build -a -v
 - go test -v 
