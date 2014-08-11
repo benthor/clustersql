@@ -31,6 +31,6 @@ before_script:
     - sudo mysql -P 3301 -e "create database IF NOT EXISTS test;"
 
 script:
-- go get -v .
-- go build -v .
-- go test -v .
+- go get -t
+- go build -a -v
+- go test -v 
