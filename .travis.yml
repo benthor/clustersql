@@ -16,7 +16,7 @@ before_install:
     - sudo apt-get update
 
 install:
-    - sudo apt-get install mariadb-galera-server galera -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
+    - sudo apt-get install mariadb-galera-server galera git -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
 
 before_script:
     - sudo mkdir -p /tmp/maria1 /tmp/maria2 /tmp/maria3
@@ -31,6 +31,6 @@ before_script:
     - sudo mysql -P 3301 -e "create database IF NOT EXISTS test;"
 
 script:
-- go get -t
+- go get
 - go build -a -v
 - go test -v 
