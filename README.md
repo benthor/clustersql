@@ -44,4 +44,4 @@ Open the registered clusterDriver with an arbitrary DSN string (not used)
 Continue to use the sql interface as documented at http://golang.org/pkg/database/sql/
 
 ## TODO
-* tests are missing
+* improve test cases to actually test failover

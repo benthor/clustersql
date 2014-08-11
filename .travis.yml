@@ -1,16 +1,24 @@
 language: go
 go: 
   - tip
-  - 1.2.2
-  - 1.1
+  - 1.2
   - 1.0
 
-before_script:
+notifications:
+    email:
+        recipients:
+            - tkr@ecix.net
+
+before_install:
     - sudo apt-get install -y python-software-properties dtach
     - sudo apt-key adv --recv-keys --keyserver hkp://keyserver.ubuntu.com:80 0xcbcb082a1bb943db
     - sudo add-apt-repository 'deb http://mirror.netcologne.de/mariadb/repo/5.5/ubuntu precise main'
     - sudo apt-get update
+
+install:
     - sudo apt-get install mariadb-galera-server galera -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
+
+before_script:
     - sudo mkdir -p /tmp/maria1 /tmp/maria2 /tmp/maria3
     - sudo chown mysql:mysql /tmp/maria*
     - sudo mysql_install_db --datadir=/tmp/maria1
@@ -21,13 +29,6 @@ before_script:
     - sudo dtach -n /tmp/maria3.soc mysqld --binlog-format=ROW --log-error=/tmp/maria3.log --wsrep-cluster-name="galeratest" --wsrep-cluster-address="gcomm://127.0.0.1:2001,127.0.0.2:2002,127.0.0.3:2003" --wsrep-provider=/usr/lib/galera/libgalera_smm.so --wsrep-node-address=127.0.0.3:2003 --wsrep-node-name="maria3" --wsrep-sst-auth=root:hunter2 --datadir=/tmp/maria3 --port=3303
     - sleep 30
     - sudo mysql -P 3301 -e "create database IF NOT EXISTS test;"
-    - sudo mysql -P 3302 -e "create table fnord (id INT PRIMARY KEY, value VARCHAR(255));" test
-    - sudo mysql -P 3303 -e "insert into fnord (value) values ('foobar');" test
-
-notifications:
-    email:
-        recipients:
-            - tkr@ecix.net
 
 script:
-- go build .
+- go test -v .
