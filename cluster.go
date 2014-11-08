@@ -89,15 +89,15 @@ func (ce ClusterError) Error() string {
 
 // Cluster is a type which implements "database/sql/driver"
 type Cluster struct {
-	Nodes  map[string]*Node // maps a node's name to its registered instance
-	Driver driver.Driver    // the upstream database driver
+	Nodes  []*Node       // registered node instances
+	Driver driver.Driver // the upstream database driver
 }
 
 // AddNode registeres backend connection information with the driver
 //
 // dataSourceName will get passed to the "Open" call of the backend driver
 func (cluster *Cluster) AddNode(nodeName, dataSourceName string) {
-	cluster.Nodes[nodeName] = &Node{nodeName, dataSourceName, nil, false, nil}
+	cluster.Nodes = append(cluster.Nodes, &Node{nodeName, dataSourceName, nil, false, nil})
 }
 
 // Node is a type describing one node in the Cluster
@@ -109,19 +109,24 @@ type Node struct {
 	Err            error       // the last error that was seen by the node
 }
 
+type conn struct {
+	conn driver.Conn
+	err  error
+}
+
 // GetConn concurrently opens connections to all nodes in the cluster, returning the first successfully opened driver.Conn.
 //
 // When opening of a connection fails, an automatic retry after 30 seconds (currently hardcoded) is scheduled. This also generates a log entry with error details.
 //
 // If no connections could be opened within 45 seconds (currently hardcoded), a ClusterError is returned.
-func (cluster *Cluster) GetConn() (driver.Conn, error) {
+func (cluster *Cluster) GetConnOld() (driver.Conn, error) {
 	nodec := make(chan *Node)
 	die := make(chan bool)
 	for _, node := range cluster.Nodes {
 		if !node.Waiting {
 			node.Waiting = true
 			go func(nodec chan *Node, node Node, die chan bool) {
-				cluster.Nodes[node.Name] = &node
+				//cluster.Nodes[node.Name] = &node
 				node.Waiting = true
 				for {
 					node.Conn, node.Err = cluster.Driver.Open(node.dataSourceName)
@@ -158,6 +163,34 @@ func (cluster *Cluster) GetConn() (driver.Conn, error) {
 	}
 	// go 1.0 expects return at the end of a function outside of any block
 	return nil, ClusterError{"Could not open any connection!"}
+}
+
+func (cluster *Cluster) GetConn() (driver.Conn, error) {
+	die := make(chan bool)
+	connc := make(chan conn)
+	for _, node := range cluster.Nodes {
+		go func(node *Node, connc chan conn, die chan bool) {
+			c, err := cluster.Driver.Open(node.dataSourceName)
+			select {
+			case connc <- conn{c, err}:
+				log.Println("selected", node.Name)
+			case <-die:
+				if c != nil {
+					c.Close()
+				}
+			}
+		}(node, connc, die)
+	}
+	var c conn
+	for c = range connc {
+		if c.conn != nil {
+			close(die)
+			break
+		} else {
+			log.Println(c.err)
+		}
+	}
+	return c.conn, c.err
 }
 
 // Prepare works as documented at http://golang.org/pkg/database/sql/#DB.Prepare
@@ -206,5 +239,5 @@ func (cluster Cluster) Open(name string) (driver.Conn, error) {
 
 // NewDriver returns an initialized Cluster driver, using upstreamDriver as backend
 func NewDriver(upstreamDriver driver.Driver) Cluster {
-	return Cluster{map[string]*Node{}, upstreamDriver}
+	return Cluster{[]*Node{}, upstreamDriver}
 }
