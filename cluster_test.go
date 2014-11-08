@@ -34,10 +34,10 @@ var db *sql.DB
 func TestOpen(t *testing.T) {
 	d := NewDriver(mysql.MySQLDriver{})
 	
-	d.AddNode("maria1", "root:hunter2@tcp(127.0.0.1:3301)/test")
-	d.AddNode("maria2", "tcp(127.0.0.1:3302)/test")
+	d.AddNode("maria1", "root@tcp(127.0.0.1:3301)/test")
+	d.AddNode("maria2", "root@tcp(127.0.0.1:3302)/test")
 	d.AddNode("maria3", "root@tcp(127.0.0.1:3303)/test")
-	d.AddNode("maria4", "root:hunter2@tcp(127.0.0.4:3304)/test")
+	d.AddNode("intentionallyBroken", "root@tcp(127.0.0.1:3304)/test")
 	sql.Register("cluster", d)
 	var err error
 	db, err = sql.Open("cluster", "galera")
