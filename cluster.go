@@ -76,7 +76,8 @@ package clustersql
 
 import "database/sql/driver"
 import "log"
-import "time"
+
+//import "time"
 
 // ClusterError is an error type which represents an unrecoverable Error
 type ClusterError struct {
@@ -97,7 +98,12 @@ type Cluster struct {
 //
 // dataSourceName will get passed to the "Open" call of the backend driver
 func (cluster *Cluster) AddNode(nodeName, dataSourceName string) {
-	cluster.Nodes = append(cluster.Nodes, &Node{nodeName, dataSourceName, nil, false, nil})
+	_, err := cluster.Driver.Open(dataSourceName)
+	if err != nil {
+		log.Printf("Not adding Node '%s': %s\n", nodeName, err)
+	} else {
+		cluster.Nodes = append(cluster.Nodes, &Node{nodeName, dataSourceName, nil, false, nil})
+	}
 }
 
 // Node is a type describing one node in the Cluster
@@ -109,88 +115,35 @@ type Node struct {
 	Err            error       // the last error that was seen by the node
 }
 
-type conn struct {
-	conn driver.Conn
-	err  error
-}
-
 // GetConn concurrently opens connections to all nodes in the cluster, returning the first successfully opened driver.Conn.
-//
-// When opening of a connection fails, an automatic retry after 30 seconds (currently hardcoded) is scheduled. This also generates a log entry with error details.
-//
-// If no connections could be opened within 45 seconds (currently hardcoded), a ClusterError is returned.
-func (cluster *Cluster) GetConnOld() (driver.Conn, error) {
-	nodec := make(chan *Node)
-	die := make(chan bool)
-	for _, node := range cluster.Nodes {
-		if !node.Waiting {
-			node.Waiting = true
-			go func(nodec chan *Node, node Node, die chan bool) {
-				//cluster.Nodes[node.Name] = &node
-				node.Waiting = true
-				for {
-					node.Conn, node.Err = cluster.Driver.Open(node.dataSourceName)
-					if node.Err != nil {
-						log.Println(node.Name, node.Err)
-						<-time.Tick(30 * time.Second)
-					} else {
-						node.Waiting = false
-						break
-					}
-				}
-				select {
-				case nodec <- &node:
-					// log.Println(node.Name, "connected")
-				case <-die:
-					// log.Println(node.Name, "dying")
-					if node.Conn != nil {
-						node.Conn.Close()
-					} else {
-						log.Println(node.Name, node.Err)
-					}
-				}
-			}(nodec, *node, die)
-		} else {
-			// log.Println(node.Name, "waiting")
-		}
-	}
-	select {
-	case node := <-nodec:
-		close(die)
-		return node.Conn, node.Err
-	case <-time.After(45 * time.Second):
-		//leave select
-	}
-	// go 1.0 expects return at the end of a function outside of any block
-	return nil, ClusterError{"Could not open any connection!"}
-}
-
+// If no driver.Conn could be successfully opened, return the latest error
 func (cluster *Cluster) GetConn() (driver.Conn, error) {
 	die := make(chan bool)
-	connc := make(chan conn)
+	nodec := make(chan *Node)
 	for _, node := range cluster.Nodes {
-		go func(node *Node, connc chan conn, die chan bool) {
-			c, err := cluster.Driver.Open(node.dataSourceName)
+		go func(node *Node, nodec chan *Node, die chan bool) {
+			node.Conn, node.Err = cluster.Driver.Open(node.dataSourceName)
 			select {
-			case connc <- conn{c, err}:
-				log.Println("selected", node.Name)
+			case nodec <- node:
+				//log.Println("selected", node.Name)
 			case <-die:
-				if c != nil {
-					c.Close()
+				//TODO: find out if this is redundant
+				if node.Conn != nil {
+					node.Conn.Close()
 				}
 			}
-		}(node, connc, die)
+		}(node, nodec, die)
 	}
-	var c conn
-	for c = range connc {
-		if c.conn != nil {
+	var n *Node
+	for n = range nodec {
+		if n.Conn != nil {
 			close(die)
 			break
 		} else {
-			log.Println(c.err)
+			log.Println(n.Err)
 		}
 	}
-	return c.conn, c.err
+	return n.Conn, n.Err
 }
 
 // Prepare works as documented at http://golang.org/pkg/database/sql/#DB.Prepare
