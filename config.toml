@@ -1,0 +1,25 @@
+# Config file for the cluster test
+# Format: TOML version 0.2.0
+# https://github.com/toml-lang/toml/blob/master/versions/toml-v0.2.0.md)
+
+# The DB Pool to work on
+[[Nodes]]
+  Name = "maria1"
+  HostName = "127.0.0.1"
+  Port = 3301
+  UserName = "root"
+  DBName = "ecix"
+
+[[Nodes]]
+  Name = "maria2"
+  HostName = "127.0.0.1"
+  Port = 3302
+  UserName = "root"
+  DBName = "ecix"
+
+[[Nodes]]
+  Name = "maria3"
+  HostName = "127.0.0.1"
+  Port = 3303
+  UserName = "root"
+  DBName = "ecix"

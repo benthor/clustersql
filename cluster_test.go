@@ -68,13 +68,12 @@ func TestOpen(t *testing.T) {
 	d := NewDriver(mysql.MySQLDriver{})
 
 	for _, ncfg := range cfg.Nodes {
-		d.AddNode(ncfg.Name, fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", ncfg.UserName, ncfg.Password, ncfg.HostName, ncfg.Port, ncfg.DBName))
+		if ncfg.Password != "" {
+			d.AddNode(ncfg.Name, fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", ncfg.UserName, ncfg.Password, ncfg.HostName, ncfg.Port, ncfg.DBName))
+		} else {
+			d.AddNode(ncfg.Name, fmt.Sprintf("%s@tcp(%s:%d)/%s", ncfg.UserName, ncfg.HostName, ncfg.Port, ncfg.DBName))
+		}
 	}
-
-	// d.AddNode("maria1", "root@tcp(127.0.0.1:3301)/test")
-	// d.AddNode("maria2", "root@tcp(127.0.0.1:3302)/test")
-	// d.AddNode("maria3", "root@tcp(127.0.0.1:3303)/test")
-	// d.AddNode("intentionallyBroken", "root@tcp(127.0.0.1:3304)/test")
 
 	sql.Register("cluster", d)
 	var err error
