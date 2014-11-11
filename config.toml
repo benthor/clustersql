@@ -8,18 +8,18 @@
   HostName = "127.0.0.1"
   Port = 3301
   UserName = "root"
-  DBName = "ecix"
+  DBName = "test"
 
 [[Nodes]]
   Name = "maria2"
   HostName = "127.0.0.1"
   Port = 3302
   UserName = "root"
-  DBName = "ecix"
+  DBName = "test"
 
 [[Nodes]]
   Name = "maria3"
   HostName = "127.0.0.1"
   Port = 3303
   UserName = "root"
-  DBName = "ecix"
+  DBName = "test"
