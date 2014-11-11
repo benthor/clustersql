@@ -90,8 +90,10 @@ func (ce ClusterError) Error() string {
 
 // Cluster is a type which implements "database/sql/driver"
 type Cluster struct {
-	Nodes  []*Node       // registered node instances
-	Driver driver.Driver // the upstream database driver
+	Nodes   []*Node       // registered node instances
+	Driver  driver.Driver // the upstream database driver
+	getconn chan *Conn
+	reqconn chan bool
 }
 
 // AddNode registeres backend connection information with the driver
@@ -102,95 +104,164 @@ func (cluster *Cluster) AddNode(nodeName, dataSourceName string) {
 	if err != nil {
 		log.Printf("Not adding Node '%s': %s\n", nodeName, err)
 	} else {
-		cluster.Nodes = append(cluster.Nodes, &Node{nodeName, dataSourceName, nil, false, nil})
+		cluster.Nodes = append(cluster.Nodes, &Node{nodeName, dataSourceName}) //, nil, false, nil})
 	}
 }
 
 // Node is a type describing one node in the Cluster
 type Node struct {
-	Name           string      // node name
-	dataSourceName string      // DSN for the backend driver
-	Conn           driver.Conn // A currently cached backend connection
-	Waiting        bool        // the node is currently waiting for the backend to open a connection
-	Err            error       // the last error that was seen by the node
+	Name           string // node name
+	dataSourceName string // DSN for the backend driver
+}
+
+type Conn struct {
+	Conn driver.Conn
+	Err  error
+}
+
+func (cluster *Cluster) getConn() {
+	connc := make(chan *Conn)
+	for {
+		die := make(chan bool)
+		//log.Println("waiting for request")
+		_, ok := <-cluster.reqconn
+		if !ok {
+			return
+		}
+		//log.Println("got request")
+		for _, node := range cluster.Nodes {
+			// if node.Waiting == true {
+			// 	continue
+			// }
+			go func(node *Node, connc chan *Conn, die chan bool) {
+				//log.Println("opening node")
+				conn, err := cluster.Driver.Open(node.dataSourceName)
+
+				//node.Conn, node.Err = cluster.Driver.Open(node.dataSourceName)
+				// if node.Err != nil {
+				// 	//log.Println("caught:", node.Err)
+				// }
+				//log.Println("opened node")
+				select {
+				case connc <- &Conn{conn, err}:
+				case <-die:
+					if conn != nil {
+						conn.Close()
+					}
+				}
+			}(node, connc, die)
+
+		}
+		//log.Println("getting node")
+		var c *Conn
+		// for c = range connc {
+		// 	if c.Err == nil {
+		// 		break
+		// 	}
+		// 	//log.Println(c.Err)
+		// }
+		c = <-connc
+		//n.Waiting = true
+		//log.Println("got node, waiting to send connection")
+		cluster.getconn <- c
+		//log.Println("sent connection")
+		close(die)
+	}
 }
 
 // GetConn concurrently opens connections to all nodes in the cluster, returning the first successfully opened driver.Conn.
 // If no driver.Conn could be successfully opened, return the latest error
-func (cluster *Cluster) GetConn() (driver.Conn, error) {
-	die := make(chan bool)
-	nodec := make(chan *Node)
-	for _, node := range cluster.Nodes {
-		go func(node *Node, nodec chan *Node, die chan bool) {
-			node.Conn, node.Err = cluster.Driver.Open(node.dataSourceName)
-			select {
-			case nodec <- node:
-				//log.Println("selected", node.Name)
-			case <-die:
-				//TODO: find out if this is redundant
-				if node.Conn != nil {
-					node.Conn.Close()
-				}
-			}
-		}(node, nodec, die)
-	}
-	var n *Node
-	for n = range nodec {
-		if n.Conn != nil {
-			close(die)
-			break
-		} else {
-			log.Println(n.Err)
-		}
-	}
-	return n.Conn, n.Err
+func (cluster *Cluster) GetConn() *Conn {
+	cluster.reqconn <- true
+	n := <-cluster.getconn
+	// die := make(chan bool)
+	// nodec := make(chan *Node)
+	// for _, node := range cluster.Nodes {
+	// 	go func(node *Node, nodec chan *Node, die chan bool) {
+	// 		node.Conn, node.Err = cluster.Driver.Open(node.dataSourceName)
+	// 		select {
+	// 		case nodec <- node:
+	// 			//log.Println("selected", node.Name)
+	// 		case <-die:
+	// 			//TODO: find out if this is redundant
+	// 			// if node.Conn != nil {
+	// 			// 	node.Conn.Close()
+	// 			// }
+	// 		}
+	// 	}(node, nodec, die)
+	// }
+	// var n *Node
+	// // for n = range nodec {
+	// // 	if n.Conn != nil {
+	// // 		close(die)
+	// // 		break
+	// // 	} else {
+	// // 		//log.Println(n.Err)
+	// // 	}
+	// // }
+	// n = <-nodec
+	// close(die)
+	return n
 }
 
 // Prepare works as documented at http://golang.org/pkg/database/sql/#DB.Prepare
 //
 // The query is executed on the node that reponds quickest
 func (cluster Cluster) Prepare(query string) (driver.Stmt, error) {
-	conn, err := cluster.GetConn()
-	if err != nil {
-		return nil, err
+	n := cluster.GetConn()
+	if n.Err != nil {
+		return nil, n.Err
 	}
 	//log.Println(query)
-	return conn.Prepare(query)
+	stmt, err := n.Conn.Prepare(query)
+	return stmt, err
 }
 
 // Close works on all backend-connections that are the clusterDriver has cached
 //
 // Always returns nil for now, errors are merely logged
 func (cluster Cluster) Close() error {
-	for name, node := range cluster.Nodes {
-		if node.Conn != nil {
-			if err := node.Conn.Close(); err != nil {
-				log.Println(name, err)
-			}
-		}
-	}
-	//FIXME
-	return nil
+	var err error
+	// for name, node := range cluster.Nodes {
+	// if node.Conn != nil {
+	// 	if err = node.Conn.Close(); err != nil {
+	// 		log.Println(name, err)
+	// 	}
+	// }
+	// }
+	cluster.getconn = nil
+	close(cluster.reqconn)
+	return err
 }
 
 // Begin works as documented at http://golang.org/pkg/database/sql/#DB.Begin
 //
 // Begin() is called on the backend connection that is available quickest
 func (cluster Cluster) Begin() (driver.Tx, error) {
-	conn, err := cluster.GetConn()
-	if err != nil {
-		return nil, err
+	n := cluster.GetConn()
+	if n.Err != nil {
+		return nil, n.Err
 	}
-	return conn.Begin()
+	tx, err := n.Conn.Begin()
+	//n.Waiting = false
+	return tx, err
 }
 
-// Open is a stub implementation to satisfy database/sql/driver interface. It does not do anything apart from returning its parent type.
+// Open is a stub implementation to satisfy database/sql/driver interface. It returns an error if the cluster has already been opened (and hasn't been closed)
+//
 // NOTE: While the name argument does not do anything at this point, this may change in the future to allow the setting of e.g., timeout options
 func (cluster Cluster) Open(name string) (driver.Conn, error) {
+	if cluster.getconn != nil || cluster.reqconn != nil {
+		return nil, ClusterError{"Cluster already opened and wasn't closed"}
+	}
+	cluster.getconn = make(chan *Conn)
+	cluster.reqconn = make(chan bool)
+	go cluster.getConn()
 	return cluster, nil
 }
 
 // NewDriver returns an initialized Cluster driver, using upstreamDriver as backend
 func NewDriver(upstreamDriver driver.Driver) Cluster {
-	return Cluster{[]*Node{}, upstreamDriver}
+	cl := Cluster{[]*Node{}, upstreamDriver, nil, nil}
+	return cl
 }
