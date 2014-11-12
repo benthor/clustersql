@@ -232,24 +232,29 @@ func TestConcurrent(t *testing.T) {
 
 			tx, err := db.Begin()
 			atomic.AddInt32(&remaining, -1)
-			fmt.Println(remaining)
+			fmt.Printf("%d ", remaining)
 
 			if err != nil {
 				if err.Error() != "Error 1040: Too many connections" {
+					fmt.Printf("Begin: Error on Conn %d: %s", id, err.Error())
 					fatalf("Begin: Error on Conn %d: %s", id, err.Error())
+					// t.Logf("Begin: Error on Conn %d: %s", id, err.Error())
 				}
+				fmt.Printf(" whoops ")
 				return
 			}
 
 			// keep the connection busy until all connections are open
 			for remaining > 0 {
 				if _, err = tx.Exec("DO 1"); err != nil {
+					fmt.Printf("Exec: Error on Conn %d: %s", id, err.Error())
 					fatalf("Exec: Error on Conn %d: %s", id, err.Error())
 					return
 				}
 			}
 
 			if err = tx.Commit(); err != nil {
+				fmt.Printf("Error on Conn %d: %s", id, err.Error())
 				fatalf("Error on Conn %d: %s", id, err.Error())
 				return
 			}
@@ -259,8 +264,10 @@ func TestConcurrent(t *testing.T) {
 		}(i)
 	}
 
+	fmt.Println("waiting")
 	// wait until all conections are open
 	wg.Wait()
+	fmt.Println("waited")
 
 	if fatalError != "" {
 		t.Fatal(fatalError)
