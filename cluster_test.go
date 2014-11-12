@@ -69,9 +69,9 @@ func TestOpen(t *testing.T) {
 
 	for _, ncfg := range cfg.Nodes {
 		if ncfg.Password != "" {
-			d.AddNode(fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", ncfg.UserName, ncfg.Password, ncfg.HostName, ncfg.Port, ncfg.DBName))
+			d.AddNode(ncfg.Name, fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", ncfg.UserName, ncfg.Password, ncfg.HostName, ncfg.Port, ncfg.DBName))
 		} else {
-			d.AddNode(fmt.Sprintf("%s@tcp(%s:%d)/%s", ncfg.UserName, ncfg.HostName, ncfg.Port, ncfg.DBName))
+			d.AddNode(ncfg.Name, fmt.Sprintf("%s@tcp(%s:%d)/%s", ncfg.UserName, ncfg.HostName, ncfg.Port, ncfg.DBName))
 		}
 	}
 
@@ -236,25 +236,25 @@ func TestConcurrent(t *testing.T) {
 
 			if err != nil {
 				if err.Error() != "Error 1040: Too many connections" {
-					fmt.Printf("Begin: Error on Conn %d: %s", id, err.Error())
+					//fmt.Printf("Begin: Error on Conn %d: %s", id, err.Error())
 					fatalf("Begin: Error on Conn %d: %s", id, err.Error())
 					// t.Logf("Begin: Error on Conn %d: %s", id, err.Error())
 				}
-				fmt.Printf(" whoops ")
+				//fmt.Printf(" whoops ")
 				return
 			}
 
 			// keep the connection busy until all connections are open
 			for remaining > 0 {
 				if _, err = tx.Exec("DO 1"); err != nil {
-					fmt.Printf("Exec: Error on Conn %d: %s", id, err.Error())
+					//fmt.Printf("Exec: Error on Conn %d: %s", id, err.Error())
 					fatalf("Exec: Error on Conn %d: %s", id, err.Error())
 					return
 				}
 			}
 
 			if err = tx.Commit(); err != nil {
-				fmt.Printf("Error on Conn %d: %s", id, err.Error())
+				//fmt.Printf("Error on Conn %d: %s", id, err.Error())
 				fatalf("Error on Conn %d: %s", id, err.Error())
 				return
 			}

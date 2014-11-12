@@ -79,45 +79,51 @@ import "database/sql/driver"
 import "log"
 
 type Driver struct {
-	upstreamDriver  driver.Driver
-	dataSourceNames []string // DSN for the backend driver
+	nodes          []Node
+	upstreamDriver driver.Driver
 }
 
-func (d *Driver) AddNode(dataSourceName string) {
-	d.dataSourceNames = append(d.dataSourceNames, dataSourceName) //, nil, false, nil})
+type Node struct {
+	Name string
+	DSN  string
+}
+
+func (d *Driver) AddNode(name, DSN string) {
+	d.nodes = append(d.nodes, Node{name, DSN}) //, nil, false, nil})
 }
 
 func (d Driver) Open(name string) (driver.Conn, error) {
 	type c struct {
+		name string
 		conn driver.Conn
 		err  error
 	}
 	die := make(chan bool)
 	cc := make(chan c)
-	for _, dataSourceName := range d.dataSourceNames {
-		go func(dataSourceName string, cc chan c, die chan bool) {
-			conn, err := d.upstreamDriver.Open(dataSourceName)
+	for _, node := range d.nodes {
+		go func(name, DSN string, cc chan c, die chan bool) {
+			conn, err := d.upstreamDriver.Open(DSN)
 			select {
-			case cc <- c{conn, err}:
+			case cc <- c{name, conn, err}:
 				//log.Println("selected", node.Name)
 			case <-die:
 				if conn != nil {
 					conn.Close()
 				}
 			}
-		}(dataSourceName, cc, die)
+		}(node.Name, node.DSN, cc, die)
 	}
 	var n c
 	// n = <-cc
 	// close(die)
-	for n = range cc {
+	for i := 0; i < len(d.nodes); i++ {
+		n = <-cc
 		if n.err == nil {
 			close(die)
 			break
 		} else {
-			log.Println("open:", n.err)
+			log.Println(n.name, n.err)
 			if n.conn != nil {
-				log.Println("closing broken connection")
 				n.conn.Close()
 			}
 		}
@@ -127,6 +133,7 @@ func (d Driver) Open(name string) (driver.Conn, error) {
 
 // NewDriver returns an initialized Cluster driver, using upstreamDriver as backend
 func NewDriver(upstreamDriver driver.Driver) Driver {
-	cl := Driver{upstreamDriver, []string{}}
+	cl := Driver{[]Node{}, upstreamDriver}
+	//log.Println("bla")
 	return cl
 }
