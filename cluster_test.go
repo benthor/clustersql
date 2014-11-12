@@ -69,9 +69,9 @@ func TestOpen(t *testing.T) {
 
 	for _, ncfg := range cfg.Nodes {
 		if ncfg.Password != "" {
-			d.AddNode(ncfg.Name, fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", ncfg.UserName, ncfg.Password, ncfg.HostName, ncfg.Port, ncfg.DBName))
+			d.AddNode(fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", ncfg.UserName, ncfg.Password, ncfg.HostName, ncfg.Port, ncfg.DBName))
 		} else {
-			d.AddNode(ncfg.Name, fmt.Sprintf("%s@tcp(%s:%d)/%s", ncfg.UserName, ncfg.HostName, ncfg.Port, ncfg.DBName))
+			d.AddNode(fmt.Sprintf("%s@tcp(%s:%d)/%s", ncfg.UserName, ncfg.HostName, ncfg.Port, ncfg.DBName))
 		}
 	}
 
