@@ -26,16 +26,16 @@
 // Package clustersql is an SQL "meta"-Driver - A clustering, implementation-
 // agnostic wrapper for any backend implementing "database/sql/driver".
 //
-// It does (latency-based) load-balancing and error-recovery over all registered
-// nodes.
+// It does (latency-based) load-balancing and error-recovery over the registered
+// set of nodes.
 //
 // It is assumed that database-state is transparently replicated over all
 // nodes by some database-side clustering solution. This driver ONLY handles
 // the client side of such a cluster.
 //
-// All errors which are made non-fatal because of failover are logged.
+// This package simply multiplexes the driver.Open() function of sql/driver to every attached node. The function is called on each node, returning the first successfully opened connection. (Any connections opening subsequently will be closed.) If opening does not succeed for any node, the latest error gets returned. Any other errors will be masked by default. However, any given latest error for any attached node will remain exposed through expvar, as well as some basic counters and timestamps.
 //
-// To make use of clustering, use clustersql with any backend driver
+// To make use of this kind of clustering, use this package with any backend driver
 // implementing "database/sql/driver" like so:
 //
 //  import "database/sql"
@@ -73,7 +73,11 @@
 // Continue to use the sql interface as documented at
 // http://golang.org/pkg/database/sql/
 //
-// NOTE: This package exports some primitive performance data via expvar. (Namespace is self-contained under the single ClusterSql Map)
+// Before using this in production, you should configure your cluster details in config.toml and run
+//
+//  go test -v .
+//
+// Note however, that non-failure of the above is no guarantee for a correctly set-up cluster.
 package clustersql
 
 import (
