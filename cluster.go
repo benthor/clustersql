@@ -72,60 +72,75 @@
 //
 // Continue to use the sql interface as documented at
 // http://golang.org/pkg/database/sql/
+//
+// NOTE: This package exports some primitive performance data via expvar. (Namespace is self-contained under the single ClusterSql Map)
 package clustersql
 
 import (
 	"database/sql/driver"
-	"log"
+	"expvar"
+	"time"
 )
 
 type Driver struct {
 	nodes          []node
 	upstreamDriver driver.Driver
+	exp            *expvar.Map
 }
 
 type node struct {
 	Name string
 	DSN  string
+	exp  *expvar.Map
 }
 
 // AddNode registers a new DSN as name with the upstream Driver.
 func (d *Driver) AddNode(name, DSN string) {
-	d.nodes = append(d.nodes, node{name, DSN}) //, nil, false, nil})
+	m := new(expvar.Map).Init()
+	n := node{name, DSN, m}
+	d.exp.Set(name, m)
+	d.nodes = append(d.nodes, n) //, nil, false, nil})
 }
 
 // Open will be called by sql.Open once registered. The name argument is ignored (it is only there to satisfy the driver interface)
 func (d Driver) Open(name string) (driver.Conn, error) {
 	type c struct {
-		name string
 		conn driver.Conn
 		err  error
+		n    node
 	}
 	die := make(chan bool)
 	cc := make(chan c)
-	for _, node := range d.nodes {
-		go func(name, DSN string, cc chan c, die chan bool) {
-			conn, err := d.upstreamDriver.Open(DSN)
+	for _, n := range d.nodes {
+		go func(n node, cc chan c, die chan bool) {
+			conn, err := d.upstreamDriver.Open(n.DSN)
 			select {
-			case cc <- c{name, conn, err}:
+			case cc <- c{conn, err, n}:
 				//log.Println("selected", node.Name)
 			case <-die:
 				if conn != nil {
 					conn.Close()
 				}
 			}
-		}(node.Name, node.DSN, cc, die)
+		}(n, cc, die)
 	}
 	var n c
-	// n = <-cc
-	// close(die)
 	for i := 0; i < len(d.nodes); i++ {
+		Time := new(expvar.String)
 		n = <-cc
+		Time.Set(time.Now().String())
 		if n.err == nil {
+			n.n.exp.Add("Connections", 1)
+			n.n.exp.Set("LastSuccess", Time)
 			close(die)
 			break
 		} else {
-			log.Println(n.name, n.err)
+			Err := new(expvar.String)
+			Err.Set(n.err.Error())
+			n.n.exp.Add("Errors", 1)
+			n.n.exp.Set("LastError", Time)
+			n.n.exp.Set("LastErrorMessage", Err)
+			//log.Println(n.n.Name, n.err)
 			if n.conn != nil {
 				n.conn.Close()
 			}
@@ -136,6 +151,10 @@ func (d Driver) Open(name string) (driver.Conn, error) {
 
 // NewDriver returns an initialized Cluster driver, using upstreamDriver as backend
 func NewDriver(upstreamDriver driver.Driver) Driver {
-	cl := Driver{[]node{}, upstreamDriver}
+	m := expvar.NewMap("ClusterSql")
+	Time := new(expvar.String)
+	Time.Set(time.Now().String())
+	m.Set("FirstInstanciated", Time)
+	cl := Driver{[]node{}, upstreamDriver, m}
 	return cl
 }
