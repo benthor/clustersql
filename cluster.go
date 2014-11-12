@@ -74,24 +74,27 @@
 // http://golang.org/pkg/database/sql/
 package clustersql
 
-import "database/sql/driver"
-
-import "log"
+import (
+	"database/sql/driver"
+	"log"
+)
 
 type Driver struct {
-	nodes          []Node
+	nodes          []node
 	upstreamDriver driver.Driver
 }
 
-type Node struct {
+type node struct {
 	Name string
 	DSN  string
 }
 
+// AddNode registers a new DSN as name with the upstream Driver.
 func (d *Driver) AddNode(name, DSN string) {
-	d.nodes = append(d.nodes, Node{name, DSN}) //, nil, false, nil})
+	d.nodes = append(d.nodes, node{name, DSN}) //, nil, false, nil})
 }
 
+// Open will be called by sql.Open once registered. The name argument is ignored (it is only there to satisfy the driver interface)
 func (d Driver) Open(name string) (driver.Conn, error) {
 	type c struct {
 		name string
@@ -133,7 +136,6 @@ func (d Driver) Open(name string) (driver.Conn, error) {
 
 // NewDriver returns an initialized Cluster driver, using upstreamDriver as backend
 func NewDriver(upstreamDriver driver.Driver) Driver {
-	cl := Driver{[]Node{}, upstreamDriver}
-	//log.Println("bla")
+	cl := Driver{[]node{}, upstreamDriver}
 	return cl
 }
