@@ -78,16 +78,21 @@
 //  go test -v .
 //
 // Note however, that non-failure of the above is no guarantee for a correctly set-up cluster.
+//
+// Finally, you SHOULD set db.MaxIdleConns and db.MaxOpenConns to a non-zero value. Although the sql
+// driver usually does a good job of doing its own pooling, file descriptors can leak in corner cases
+// (of which this library might constitue an example).
 package clustersql
 
 import (
 	"database/sql/driver"
 	"expvar"
+	"sort"
 	"time"
 )
 
 type Driver struct {
-	nodes          []node
+	nodes          map[string]*node
 	upstreamDriver driver.Driver
 	exp            *expvar.Map
 }
@@ -103,7 +108,22 @@ func (d *Driver) AddNode(name, DSN string) {
 	m := new(expvar.Map).Init()
 	n := node{name, DSN, m}
 	d.exp.Set(name, m)
-	d.nodes = append(d.nodes, n) //, nil, false, nil})
+	d.nodes[name] = &n
+}
+
+// DelNode unregisters a named Node from the upstream Driver. This SHOULD(TM) be non-invasive, allowing all pending SQL actions on that node to complete as expected
+func (d *Driver) DelNode(name string) {
+	d.nodes[name] = nil
+}
+
+// Nodes returns a sorted list of the names of the registered Nodes.
+func (d *Driver) Nodes() []string {
+	var list []string
+	for name := range d.nodes {
+		list = append(list, name)
+	}
+	sort.Strings(list)
+	return list
 }
 
 // Open will be called by sql.Open once registered. The name argument is ignored (it is only there to satisfy the driver interface)
@@ -111,12 +131,12 @@ func (d Driver) Open(name string) (driver.Conn, error) {
 	type c struct {
 		conn driver.Conn
 		err  error
-		n    node
+		n    *node
 	}
 	die := make(chan bool)
 	cc := make(chan c)
 	for _, n := range d.nodes {
-		go func(n node, cc chan c, die chan bool) {
+		go func(n *node, cc chan c, die chan bool) {
 			conn, err := d.upstreamDriver.Open(n.DSN)
 			select {
 			case cc <- c{conn, err, n}:
@@ -159,6 +179,6 @@ func NewDriver(upstreamDriver driver.Driver) Driver {
 	Time := new(expvar.String)
 	Time.Set(time.Now().String())
 	m.Set("FirstInstanciated", Time)
-	cl := Driver{[]node{}, upstreamDriver, m}
+	cl := Driver{map[string]*node{}, upstreamDriver, m}
 	return cl
 }
