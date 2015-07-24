@@ -65,7 +65,7 @@ func TestOpen(t *testing.T) {
 		}
 	}
 
-	d := NewDriver(mysql.MySQLDriver{})
+	d := NewDriver("ClusterSql", mysql.MySQLDriver{})
 
 	for _, ncfg := range cfg.Nodes {
 		if ncfg.Password != "" {
