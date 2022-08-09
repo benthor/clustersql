@@ -1,5 +1,6 @@
-# clustersql [![Build Status](https://travis-ci.org/benthor/clustersql.png)](https://travis-ci.org/benthor/clustersql) [![GoDoc](https://godoc.org/github.com/benthor/clustersql?status.svg)](http://godoc.org/github.com/benthor/clustersql)
+# [Archived repo] clustersql [![Build Status](https://travis-ci.org/benthor/clustersql.png)](https://travis-ci.org/benthor/clustersql) [![GoDoc](https://godoc.org/github.com/benthor/clustersql?status.svg)](http://godoc.org/github.com/benthor/clustersql)
 
+*This project is archived, I myself am not using it any more.*
 
 Go Clustering SQL Driver - A clustering, implementation-agnostic "meta"-driver for any backend implementing "database/sql/driver".
 
