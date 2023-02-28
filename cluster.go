@@ -174,8 +174,8 @@ func (d Driver) Open(name string) (driver.Conn, error) {
 }
 
 // NewDriver returns an initialized Cluster driver, using upstreamDriver as backend
-func NewDriver(upstreamDriver driver.Driver) Driver {
-	m := expvar.NewMap("ClusterSql")
+func NewDriver(id string, upstreamDriver driver.Driver) Driver {
+	m := expvar.NewMap(id)
 	Time := new(expvar.String)
 	Time.Set(time.Now().String())
 	m.Set("FirstInstanciated", Time)
